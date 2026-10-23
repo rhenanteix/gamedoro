@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>gameDoro — Foque. Jogue. Evolua.</title>
+<meta name="description" content="Timer de foco gamificado no navegador: um herói corre enquanto você estuda ou trabalha. Pomodoro automático, mundos, skins, amigos e ranking. Grátis para começar.">
+<meta name="theme-color" content="#3d4a9a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath fill='%23232a6b' d='M4 1h8l3 4-7 10L1 5z'/%3E%3Cpath fill='%2356d3c2' d='M5 2h6l2 3-5 8-5-8z'/%3E%3Cpath fill='%23b8f3ea' d='M5 2h3L6 5H3z'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="#/"><canvas id="logo" width="16" height="16" aria-hidden="true"></canvas><span>gameDoro</span></a>
+    <nav id="nav" aria-label="Principal">
+      <a href="#/" data-v="timer">Fase</a><a href="#/diario" data-v="diario">Diário</a><a href="#/mundos" data-v="mundos">Mundos</a><a href="#/heroi" data-v="heroi">Herói</a><a href="#/loja" data-v="loja">Loja</a><a href="#/amigos" data-v="amigos">Amigos</a><a href="#/aventura" data-v="aventura">Aventura</a><a href="#/cooperativo" data-v="cooperativo">Grupo</a><a href="#/ranking" data-v="ranking">Ranking</a>
+    </nav>
+    <div class="right">
+      <span class="chip" id="gems" title="Suas gemas"></span>
+      <span class="chip warm" id="streak" title="Dias seguidos com 10+ min de foco"></span>
+      <button class="pill" id="btn-cfg">Ajustes</button>
+      <button class="pill solid" id="btn-auth">Entrar</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="view" id="v-timer">
+    <div class="stage">
+      <canvas id="stage" aria-label="Seu herói caminhando em direção à bandeira"></canvas>
+      <div class="over tl" id="loc"></div>
+      <label class="over tr"><input type="checkbox" id="pip-ck"> Mini janela</label>
+      <div class="over cp" id="cp"></div>
+    </div>
+    <div class="grid3">
+      <div class="card">
+        <label>No que você vai focar?<input id="focus-task" maxlength="120" placeholder="Ex.: revisar o capítulo 3"></label><label>Projeto ou matéria<input id="focus-project" maxlength="60" placeholder="Ex.: Matemática"></label><div class="mode"><span class="tag" id="mode-tag">FOCO</span><span class="dots" id="dots"></span><span class="muted" id="cycle"></span></div>
+        <div class="time" id="time">25:00</div>
+        <p class="muted" id="sub"></p>
+        <div class="track"><b id="prog"></b></div>
+        <div class="row"><button class="btn primary" id="go">Iniciar</button><button class="btn" id="stop">Encerrar</button></div>
+        <p class="muted small" id="earn"></p>
+      </div>
+      <div class="card">
+        <h2>Duração e mundo</h2>
+        <p class="muted">Duração do foco</p>
+        <div class="presets" id="presets">
+          <button class="opt" id="free-mode">Modo livre</button><button class="opt" id="preset-52">52 / 17</button><button class="opt" data-m="25">25 min</button><button class="opt" data-m="50">50 min</button>
+          <input class="opt" id="custom" type="number" min="1" max="120" placeholder="Outro" aria-label="Outra duração em minutos"><button class="opt" id="custom-ok">OK</button>
+        </div>
+        <p class="muted small" id="auto-note"></p><label><input type="checkbox" id="strict-mode"> Modo estrito · 3 corações</label><p id="hearts" class="muted small">Sair da aba durante o foco custa um coração.</p>
+        <div class="worlds" id="worlds"></div>
+      </div>
+      <div class="card">
+        <h2>Som e alertas</h2>
+        <div class="sw"><div>Som ambiente<small class="muted" id="amb-name"></small></div><button class="toggle" role="switch" id="t-ambient" aria-label="Som ambiente"></button></div>
+        <div class="sw"><div>Alerta de fim</div><button class="toggle" role="switch" id="t-alert" aria-label="Alerta de fim"></button></div>
+        <div class="sw"><div>Notificação do navegador</div><button class="toggle" role="switch" id="t-notify" aria-label="Notificação do navegador"></button></div>
+        <div id="mixer"><label>Chuva<input type="range" data-sound="rain" min="0" max="100" value="0"></label><label>Fogueira<input type="range" data-sound="fire" min="0" max="100" value="0"></label><label>Vento<input type="range" data-sound="wind" min="0" max="100" value="0"></label></div><label>Clima<select id="weather"><option value="clear">Céu limpo</option><option value="rain">Chuva</option><option value="snow">Neve</option></select></label><p class="muted small">Luz sincronizada com o relógio local.</p><button class="btn wide" id="share-card">Baixar cartão de conquista</button><button class="btn wide" id="pip-btn">Abrir mini janela (PiP)</button>
+      </div>
+    </div>
+    <div class="card" id="focus-guide" hidden aria-live="polite"></div><div class="card" id="room-summary" hidden></div>
+  </section>
+
+  <section class="view" id="v-aventura" hidden></section><section class="view" id="v-cooperativo" hidden></section>
+  <section class="view" id="v-diario" hidden></section>
+  <section class="view" id="v-mundos" hidden></section>
+  <section class="view" id="v-heroi" hidden></section>
+  <section class="view" id="v-loja" hidden></section>
+  <section class="view" id="v-amigos" hidden></section>
+  <section class="view" id="v-ranking" hidden></section>
+</main>
+
+<dialog id="dlg-auth" aria-labelledby="auth-t">
+  <form id="af" method="dialog">
+    <h2 id="auth-t">Entrar no gameDoro</h2>
+    <p class="muted">Salve seu progresso, jogue em qualquer dispositivo e dispute o ranking com amigos.</p>
+    <label id="nm" hidden>Nome<input id="nm-i" autocomplete="nickname" maxlength="24"></label>
+    <label>E-mail<input id="em" type="email" autocomplete="email" required></label>
+    <label>Senha (mínimo 8 caracteres)<input id="pw" type="password" autocomplete="current-password" minlength="8" required></label>
+    <p class="err" id="err" role="alert"></p>
+    <div class="row"><button class="btn primary" id="af-ok" type="submit">Entrar</button><button class="btn" id="af-cancel" type="button">Cancelar</button></div>
+    <p class="muted"><button class="link" id="af-sw" type="button">Criar uma conta</button></p>
+  </form>
+</dialog>
+
+<dialog id="dlg-cfg" aria-labelledby="cfg-t">
+  <form method="dialog" id="cf">
+    <h2 id="cfg-t">Ajustes</h2>
+    <div class="cfg">
+      <label>Pausa curta (min)<input type="number" id="c-respiro" min="1" max="60"></label>
+      <label>Pausa longa (min)<input type="number" id="c-descanso" min="1" max="90"></label>
+      <label>Ciclos até a pausa longa<input type="number" id="c-ciclos" min="2" max="8"></label>
+    </div>
+    <div class="sw"><div>Pomodoro automático<small class="muted">Começa a próxima etapa sozinho</small></div><button type="button" class="toggle" role="switch" id="t-auto" aria-label="Pomodoro automático"></button></div>
+    <p class="err" id="cfg-err" role="alert"></p>
+    <div class="row"><button class="btn primary" type="submit">Salvar</button><button class="btn" type="button" id="cf-cancel">Fechar</button></div>
+    <p class="muted small" id="acct"></p>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status"></div>
+<script src="shared.js"></script>
+<script src="progression.js"></script>
+<script src="scene.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
