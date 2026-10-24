@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const G = require('./public/shared.js');
 const P = require('./public/progression.js');
 
-const PORT = +process.env.PORT || 3004;
+const PORT = +process.env.PORT || 3005;
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
 fs.mkdirSync(DATA, { recursive: true });
 let SECRET = process.env.SECRET;
@@ -35,16 +35,40 @@ CREATE TABLE IF NOT EXISTS active(
   planned INTEGER NOT NULL, started_at INTEGER NOT NULL, credited INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS friends(
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY(user_id,friend_id));
+/*** New tables for missions, chat and achievements ***/
+CREATE TABLE IF NOT EXISTS missions(
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  day TEXT NOT NULL,
+  description TEXT NOT NULL,
+  completed INTEGER NOT NULL DEFAULT 0,
+  reward_gems INTEGER NOT NULL DEFAULT 5,
+  reward_xp INTEGER NOT NULL DEFAULT 10
+);
+CREATE TABLE IF NOT EXISTS chat_messages(
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message TEXT NOT NULL,
+  ts INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS achievements(
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  earned_at INTEGER NOT NULL,
+  description TEXT
+);
 `);
+
 db.exec(`CREATE TABLE IF NOT EXISTS progression(user_id INTEGER PRIMARY KEY REFERENCES users(id), data TEXT NOT NULL);`);
-for (const [name, type] of [['task',"TEXT NOT NULL DEFAULT ''"], ['project',"TEXT NOT NULL DEFAULT ''"], ['room',"TEXT"], ['free','INTEGER NOT NULL DEFAULT 0'], ['planned','INTEGER NOT NULL DEFAULT 0']]) {
+for (const [name, type] of [['task', "TEXT NOT NULL DEFAULT ''"], ['project', "TEXT NOT NULL DEFAULT ''"], ['room', "TEXT"], ['free', 'INTEGER NOT NULL DEFAULT 0'], ['planned', 'INTEGER NOT NULL DEFAULT 0']]) {
   if (!db.prepare('PRAGMA table_info(sessions)').all().some(c => c.name === name)) db.exec(`ALTER TABLE sessions ADD COLUMN ${name} ${type}`);
 }
 const tx = fn => { db.exec('BEGIN IMMEDIATE'); try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { db.exec('ROLLBACK'); throw e; } };
 const one = (sql, ...a) => db.prepare(sql).get(...a), all = (sql, ...a) => db.prepare(sql).all(...a), run = (sql, ...a) => db.prepare(sql).run(...a);
 
 const progressOf = uid => P.normalize(JSON.parse(one('SELECT data FROM progression WHERE user_id=?', uid)?.data || 'null'));
-const saveProgress = (uid,p) => run('INSERT INTO progression VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data',uid,JSON.stringify(p));
+const saveProgress = (uid, p) => run('INSERT INTO progression VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data', uid, JSON.stringify(p));
 
 /* ---------- Senhas, tokens, códigos ---------- */
 const hashPass = p => { const s = crypto.randomBytes(16); return s.toString('hex') + ':' + crypto.scryptSync(p, s, 64).toString('hex'); };
@@ -56,7 +80,7 @@ const verify = t => {
   const e = mac(p); if (e.length !== s.length || !crypto.timingSafeEqual(Buffer.from(e), Buffer.from(s))) return null;
   try { const d = JSON.parse(Buffer.from(p, 'base64url')); return d.exp > Date.now() ? d.uid : null; } catch { return null; }
 };
-const newCode = () => { for (;;) { const c = Array.from(crypto.randomBytes(6), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join(''); if (!one('SELECT 1 FROM users WHERE code=?', c)) return c; } };
+const newCode = () => { for (; ;) { const c = Array.from(crypto.randomBytes(6), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join(''); if (!one('SELECT 1 FROM users WHERE code=?', c)) return c; } };
 
 /* ---------- Estado ---------- */
 const utcToday = () => new Date().toISOString().slice(0, 10);
@@ -68,9 +92,11 @@ const state = (uid, today) => {
   const recent = {}; for (let i = 0; i < 60; i++) { const d = G.addDays(today, -i); if (hist[d]) recent[d] = hist[d]; }
   return {
     user: { name: u.name, email: u.email, code: u.code },
-    state: { gems: u.gems, xp: u.xp, skin: u.skin, world: u.world, cycle: u.cycle, cfg: JSON.parse(u.cfg), hist: recent,
+    state: {
+      gems: u.gems, xp: u.xp, skin: u.skin, world: u.world, cycle: u.cycle, cfg: JSON.parse(u.cfg), hist: recent,
       progress: progressOf(uid), streak: P.streak(hist, today, progressOf(uid)), km: G.kmFor(tot.m), totalMin: tot.m, sessions: tot.n || 0, todayMin: hist[today] || 0,
-      owned: all('SELECT item FROM owned WHERE user_id=?', uid).map(r => r.item) }
+      owned: all('SELECT item FROM owned WHERE user_id=?', uid).map(r => r.item)
+    }
   };
 };
 
@@ -78,8 +104,10 @@ const state = (uid, today) => {
 const app = express();
 app.disable('x-powered-by'); app.set('trust proxy', 1);
 app.use((req, res, next) => {
-  res.set({ 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin',
-    'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'" });
+  res.set({
+    'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin',
+    'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+  });
   next();
 });
 app.use(express.json({ limit: '10kb' }));
@@ -127,7 +155,12 @@ app.put('/api/settings', auth, (req, res) => {
   res.json(state(req.uid, req.today));
 });
 
+// --- Register new feature routers ------------------------------------------------
 const creditCoop = require('./cooperative')({ app, db, auth, bad, one, all, run, tx });
+const missions = require('./src/missions')({ app, db, auth, bad, tx });
+const chat = require('./src/chat')({ app, db, auth, bad });
+const achievements = require('./src/achievements')({ app, db, auth, bad });
+
 
 /* Sessões: o servidor só credita o que o relógio dele confirma */
 app.post('/api/sessions/start', auth, (req, res) => {
@@ -137,9 +170,15 @@ app.post('/api/sessions/start', auth, (req, res) => {
   tx(() => {
     const old = one('SELECT session_id FROM active WHERE user_id=?', req.uid);
     if (old) { run('DELETE FROM sessions WHERE id=? AND minutes=0', old.session_id); run('DELETE FROM active WHERE user_id=?', req.uid); }
-    const room = one('SELECT room FROM room_members WHERE user_id=?',req.uid)?.room || null;
-    const s = run('INSERT INTO sessions(user_id,day,world,at,task,project,room,free,planned) VALUES(?,?,?,?,?,?,?,?,?)', req.uid, req.today, u.world, Date.now(), String(req.body.task||'').trim().slice(0,120), String(req.body.project||'').trim().slice(0,60), room, req.body.free===true?1:0, planned);
+    const room = one('SELECT room FROM room_members WHERE user_id=?', req.uid)?.room || null;
+    const s = run('INSERT INTO sessions(user_id,day,world,at,task,project,room,free,planned) VALUES(?,?,?,?,?,?,?,?,?)', req.uid, req.today, u.world, Date.now(), String(req.body.task || '').trim().slice(0, 120), String(req.body.project || '').trim().slice(0, 60), room, req.body.free === true ? 1 : 0, planned);
     run('INSERT INTO active(user_id,session_id,planned,started_at) VALUES(?,?,?,?)', req.uid, s.lastInsertRowid, planned, Date.now());
+    // Ensure a mission exists for today for this user
+    const hasMission = one('SELECT 1 FROM missions WHERE user_id=? AND day=?', req.uid, req.today);
+    if (!hasMission) {
+      const desc = `Concluir ${planned} minutos de foco`; // simple mission description
+      run('INSERT INTO missions(user_id,day,description,reward_gems,reward_xp) VALUES(?,?,?,?,?)', req.uid, req.today, desc, 5, 10);
+    }
   });
   res.json({ ok: true });
 });
@@ -150,15 +189,15 @@ app.post('/api/sessions/sync', auth, (req, res) => {
   if (!Number.isSafeInteger(min) || min < 0 || (a.planned > 0 && min > a.planned)) return bad(res, 'Minutos inválidos.');
   const elapsed = Math.floor((Date.now() - a.started_at) / 60000) + 1;
   if (!process.env.GAMEDORO_FAST && min > elapsed) return bad(res, 'Tempo insuficiente para creditar esses minutos.', 422);
-  if (final === 'complete' && (a.planned===0 || min < a.planned)) return bad(res, 'A fase ainda não terminou.', 422);
+  if (final === 'complete' && (a.planned === 0 || min < a.planned)) return bad(res, 'A fase ainda não terminou.', 422);
   const done = final === 'complete', m = Math.max(min, a.credited);
   tx(() => {
-    const session = one('SELECT * FROM sessions WHERE id=?',a.session_id);
+    const session = one('SELECT * FROM sessions WHERE id=?', a.session_id);
     creditCoop(req.uid, m - a.credited, session);
     const p = progressOf(req.uid);
-    const xpBonus = Math.floor(m*4*p.skills.xp*.1)-Math.floor(a.credited*4*p.skills.xp*.1);
-    const gemBonus = Math.floor(m*p.skills.gems*.1)-Math.floor(a.credited*p.skills.gems*.1);
-    saveProgress(req.uid,P.credit(p,req.today,m-a.credited,done));
+    const xpBonus = Math.floor(m * 4 * p.skills.xp * .1) - Math.floor(a.credited * 4 * p.skills.xp * .1);
+    const gemBonus = Math.floor(m * p.skills.gems * .1) - Math.floor(a.credited * p.skills.gems * .1);
+    saveProgress(req.uid, P.credit(p, req.today, m - a.credited, done));
     const gems = G.gemsFor(m, false) - G.gemsFor(a.credited, false) + (done ? 5 : 0);
     run('UPDATE users SET gems=gems+?, xp=xp+?, cycle=cycle+? WHERE id=?', gems + gemBonus, G.xpFor(m - a.credited) + xpBonus, done ? 1 : 0, req.uid);
     run('UPDATE sessions SET minutes=?, completed=?, day=? WHERE id=?', m, done ? 1 : 0, req.today, a.session_id);
@@ -197,9 +236,9 @@ app.get('/api/history', auth, (req, res) => {
   const days = Array.from({ length: 30 }, (_, i) => { const d = G.addDays(t, -29 + i); return { day: d, min: byDay[d] || 0 }; });
   const sum = n => days.slice(-n).reduce((a, d) => a + d.min, 0);
   const sessions = all('SELECT day, minutes, world, completed, at, task, project, free, planned FROM sessions WHERE user_id=? AND minutes>0 ORDER BY at DESC LIMIT 15', req.uid);
-  const projects = all("SELECT CASE WHEN project='' THEN 'Sem projeto' ELSE project END AS name, SUM(minutes) AS minutes, COUNT(*) AS attempts, SUM(completed) AS completed FROM sessions WHERE user_id=? GROUP BY project ORDER BY minutes DESC",req.uid);
-  const durations = all('SELECT planned, COUNT(*) AS attempts, SUM(completed) AS completed FROM sessions WHERE user_id=? AND free=0 AND planned>0 AND (minutes>0 OR id NOT IN (SELECT session_id FROM active)) GROUP BY planned',req.uid);
-  const hours = all('SELECT at,minutes,completed FROM sessions WHERE user_id=? AND minutes>0',req.uid);
+  const projects = all("SELECT CASE WHEN project='' THEN 'Sem projeto' ELSE project END AS name, SUM(minutes) AS minutes, COUNT(*) AS attempts, SUM(completed) AS completed FROM sessions WHERE user_id=? GROUP BY project ORDER BY minutes DESC", req.uid);
+  const durations = all('SELECT planned, COUNT(*) AS attempts, SUM(completed) AS completed FROM sessions WHERE user_id=? AND free=0 AND planned>0 AND (minutes>0 OR id NOT IN (SELECT session_id FROM active)) GROUP BY planned', req.uid);
+  const hours = all('SELECT at,minutes,completed FROM sessions WHERE user_id=? AND minutes>0', req.uid);
   res.json({ days, sessions, projects, hours, durations, totals: { week: sum(7), month: sum(30), weekKm: G.kmFor(sum(7)), monthKm: G.kmFor(sum(30)) } });
 });
 const weekMin = (uid, t) => one('SELECT COALESCE(SUM(minutes),0) AS m FROM sessions WHERE user_id=? AND day>=?', uid, G.addDays(t, -6)).m;
@@ -230,8 +269,8 @@ app.get('/api/ranking', auth, (req, res) => {
   res.json({ top, me: { rank, min: mine } });
 });
 
-app.post('/api/progression',auth,(req,res)=> {
-  try { tx(()=> { const st=state(req.uid,req.today).state; const out=P.action(progressOf(req.uid),req.body,{gems:st.gems,hist:st.hist,day:req.today,randomReward:crypto.randomInt(20,61)});saveProgress(req.uid,out.progress);run('UPDATE users SET gems=? WHERE id=?',out.gems,req.uid); });res.json(state(req.uid,req.today)); } catch(e){bad(res,e.message,409);}
+app.post('/api/progression', auth, (req, res) => {
+  try { tx(() => { const st = state(req.uid, req.today).state; const out = P.action(progressOf(req.uid), req.body, { gems: st.gems, hist: st.hist, day: req.today, randomReward: crypto.randomInt(20, 61) }); saveProgress(req.uid, out.progress); run('UPDATE users SET gems=? WHERE id=?', out.gems, req.uid); }); res.json(state(req.uid, req.today)); } catch (e) { bad(res, e.message, 409); }
 });
 
 app.use('/api', (req, res) => bad(res, 'Rota não encontrada.', 404));
