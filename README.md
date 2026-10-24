@@ -78,3 +78,19 @@ Salas e apostas exigem conta. Progressão e recursos individuais funcionam tamb�
     npm run smoke          # fluxos da interface em JSDOM
 
 Áudio real, exportação PNG e comportamento visual responsivo ainda devem ser conferidos em navegador real; JSDOM simula o canvas e não reproduz áudio.
+
+## Compra de gemas — AbacatePay
+
+O checkout PIX usa a API v1 (`POST /v1/billing/create`). Os pacotes são definidos no servidor: 5 gemas/R$ 1,99, 15/R$ 4,99, 40/R$ 11,99 e 100/R$ 27,99. É necessário entrar na conta para comprar.
+
+1. Copie `.env.example` para `.env`. O servidor carrega esse arquivo ao iniciar; variáveis já definidas no ambiente têm prioridade.
+2. Preencha `ABACATEPAY_API_KEY` com sua chave **compatível com API v1**, `APP_URL` com a URL pública da aplicação e `ABACATEPAY_WEBHOOK_SECRET` com um segredo aleatório. Nunca coloque esses segredos nos arquivos de `public/`.
+3. No painel AbacatePay, cadastre o webhook `https://SEU-DOMINIO/api/payments/webhook`, informe o mesmo secret e habilite o evento `billing.paid`. O provedor envia o secret no parâmetro `webhookSecret`. O servidor valida também `X-Webhook-Signature` sobre o corpo original.
+4. Use chave e webhook do mesmo ambiente. Para testes, mantenha `ABACATEPAY_DEV_MODE=true`; para cobranças reais, use chave e webhook de produção com `ABACATEPAY_DEV_MODE=false`. Testes devem usar um banco separado (`DATA_DIR`) para não misturar gemas simuladas com contas reais.
+5. Reinicie com `npm start`, entre na conta e abra **Loja → Pacotes de Gemas → Comprar com PIX**. O AbacatePay coleta os dados do comprador no checkout. Em desenvolvimento, o webhook precisa de uma URL HTTPS pública que encaminhe ao servidor local.
+
+As gemas só entram após o webhook autenticado confirmar o valor e o ambiente da cobrança. O retorno do checkout consulta a confirmação por até 90 segundos e atualiza o saldo; retornar pela URL, sozinho, não concede gemas. Se a confirmação demorar mais, recarregue a página depois. Notificações repetidas não duplicam o crédito. Sem configuração, a loja mostra indisponibilidade e desabilita a compra.
+
+Validação local: `npm run test:payments` usa banco temporário e respostas simuladas do provedor; não cria cobranças reais. Para homologar, faça uma compra em Dev mode e confira a entrega do webhook no painel. A ativação em produção depende das credenciais e do webhook configurado no painel.
+
+Referências: [criação de cobrança v1](https://abacatepay.readme.io/reference/postbillingcreate), [eventos v1](https://docs.abacatepay.com/pages/v1/webhooks), [segurança de webhooks](https://docs.abacatepay.com/pages/webhooks). A API v2 usa outro contrato e não é utilizada nesta integração.

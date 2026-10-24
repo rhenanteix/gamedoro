@@ -270,30 +270,29 @@ import * as Pay from './payments.js';
         <h2 style="margin-top:28px">Pacotes de Gemas</h2>
         <div id="gem-packages" class="grid"></div>
       `;
-      // Load gem packages from backend
-      Pay.getPackages()
-        .then(pkgs => {
-          const container = $('#gem-packages');
-          if (!container) return;
-          container.innerHTML = pkgs.map(p => `
-            <div class="card item">
-              <h3>${p.gems} gemas</h3>
-              <p class="muted small">R$${(p.priceCents/100).toFixed(2)}</p>
-              <button class="btn sm primary" data-pkg="${p.id}">Comprar</button>
-            </div>
-          `).join('');
-          $$('#gem-packages button[data-pkg]').forEach(btn => {
+      const container = $('#gem-packages');
+      if (!TOKEN) container.innerHTML = needLogin('Entre para comprar gemas');
+      else {
+        container.textContent = 'Carregando pacotes…';
+        Pay.getPackages(api).then(({ packages, available, message }) => {
+          if (!container.isConnected) return;
+          container.innerHTML = (message ? `<p role="status">${esc(message)}</p>` : '') + packages.map(p => `
+            <div class="card item"><h3>${p.gems} gemas</h3>
+            <p>${(p.priceCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <button class="btn sm primary" data-pkg="${p.id}" ${available ? '' : 'disabled'}>Comprar com PIX</button></div>`).join('');
+          $$('button[data-pkg]', container).forEach(btn => {
             btn.onclick = async () => {
+              btn.disabled = true; btn.textContent = 'Abrindo pagamento…';
               try {
-                const resp = await Pay.createCheckout(btn.dataset.pkg);
-                if (resp.checkoutUrl) location.href = resp.checkoutUrl;
+                const resp = await Pay.createCheckout(api, btn.dataset.pkg);
+                location.assign(resp.checkoutUrl);
               } catch (e) {
-                toast(e.message);
+                toast(e.message); btn.disabled = false; btn.textContent = 'Comprar com PIX';
               }
             };
           });
-        })
-        .catch(e => console.error('Payments load error', e));
+        }).catch(e => { container.textContent = e.message; });
+      }
       paintItems(r);
     },
     async amigos() {
@@ -464,6 +463,27 @@ import * as Pay from './payments.js';
     try { await Store.saveCfg(c); $('#dlg-cfg').close(); if (!T.running && !T.session) setMode(T.mode); else refresh(); toast('Ajustes salvos.'); } catch (x) { $('#cfg-err').textContent = x.message; }
   };
 
+  // Returning from checkout never grants gems: wait for the verified webhook.
+  async function checkPaymentReturn() {
+    const reference = new URLSearchParams(location.search).get('payment');
+    if (!reference || !TOKEN) return;
+    for (let i = 0; i < 30; i++) {
+      try {
+        const payment = await Pay.getPayment(api, reference);
+        if (payment.status === 'paid') {
+          await Store.load(); refresh();
+          if (location.hash === '#/loja') await RENDER.loja();
+          toast(`Compra confirmada! +${payment.gems} gemas.`);
+          const url = new URL(location.href); url.searchParams.delete('payment'); history.replaceState(null, '', url);
+          return;
+        }
+        if (i === 0) toast('Aguardando confirmação do pagamento…');
+      } catch (e) { toast(e.message); return; }
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+    toast('Confirmação ainda pendente. As gemas serão creditadas quando o pagamento for confirmado.');
+  }
+
   /* ---------- Início ---------- */
   let last = performance.now(), tt = 0, scroll = 0;
   function loop(now) {
@@ -480,6 +500,6 @@ import * as Pay from './payments.js';
       S = localView();
     }
     main = new Stage($('#stage'), { cssH: cw => (cw > 700 ? 320 : 250), target: 230 });
-    setMode('fase'); await route(); pollCoop(); setInterval(pollCoop, 15000); setInterval(tick, 250); requestAnimationFrame(loop);
+    setMode('fase'); await route(); checkPaymentReturn(); pollCoop(); setInterval(pollCoop, 15000); setInterval(tick, 250); requestAnimationFrame(loop);
   })();
 })();

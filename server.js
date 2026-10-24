@@ -7,6 +7,9 @@ const fs = require('node:fs');
 const G = require('./public/shared.js');
 const P = require('./public/progression.js');
 
+const envFile = path.join(__dirname, '.env');
+if (fs.existsSync(envFile)) process.loadEnvFile(envFile);
+
 const PORT = +process.env.PORT || 3005;
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
 fs.mkdirSync(DATA, { recursive: true });
@@ -108,7 +111,7 @@ app.use((req, res, next) => {
   });
   next();
 });
-app.use(express.json({ limit: '10kb' }));
+app.use(express.json({ limit: '100kb', verify: (req, res, buffer) => { if (req.path === '/api/payments/webhook') req.rawBody = buffer; } }));
 const hits = new Map();
 const limiter = (max, ms) => (req, res, next) => {
   const now = Date.now(); let h = hits.get(req.ip); if (!h || h.reset < now) h = { n: 0, reset: now + ms };

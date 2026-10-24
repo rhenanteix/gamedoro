@@ -11,7 +11,8 @@
     "test": "node test.js",
     "preview": "node tools/render.js preview.png",
     "smoke": "node tools/smoke.js",
-    "test:features": "node test-features.js"
+    "test:features": "node test-features.js",
+    "test:payments": "node test-payments.js"
   },
   "dependencies": {
     "express": "^4.21.2",
