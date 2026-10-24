@@ -56,7 +56,7 @@
     'KBbbbKxwwtttttuK',
     'KBbbbKtttvttttuK',
     '.KBbbKttttttttuK',
-    '.KBBbKggygggggggK'.replace('ggggggggK','gggggggK')
+    '.KBBbKggygggggggK'.replace('ggggggggK', 'gggggggK')
   ];
   const SCARF = [['wwwx.', '.xwwx'], ['.wwwx', 'wwx..']];
   const OUTFITS = {
@@ -139,9 +139,9 @@
     b.outline('#1d4a33'); return b.compile();
   }
   function bush() { const b = Buf(18, 12); b.disc(5, 8, 5, 4, '#4faa56', '#86d874', '#357f43'); b.disc(12, 7, 6, 5, '#4faa56', '#86d874', '#357f43'); b.set(8, 5, '#ee6a7a'); b.set(13, 8, '#ffd166'); b.set(4, 6, '#ffd166'); b.outline('#1d4a2d'); return b.compile(); }
-  function deadBush() { const b = Buf(14, 10); [[7, 9, 7, 3], [7, 7, 3, 2], [7, 7, 11, 3], [7, 5, 5, 1], [7, 5, 9, 1]].forEach(([x0, y0, x1, y1]) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); for (let i = 0; i <= n; i++) b.set(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, '#8a6238'); }); b.outline('#4a3320'); return b.compile(); }
+  function deadBush() { const b = Buf(14, 10);[[7, 9, 7, 3], [7, 7, 3, 2], [7, 7, 11, 3], [7, 5, 5, 1], [7, 5, 9, 1]].forEach(([x0, y0, x1, y1]) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); for (let i = 0; i <= n; i++) b.set(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, '#8a6238'); }); b.outline('#4a3320'); return b.compile(); }
   const flower = (c, h) => { const b = Buf(5, 8); b.rect(2, 4, 1, 4, '#3f8f48'); b.set(1, 6, '#3f8f48'); b.set(3, 5, '#3f8f48'); b.rect(1, 1, 3, 3, c); b.set(2, 2, h || '#fff2b0'); b.set(2, 0, c); b.set(2, 4, c); return b.compile(); };
-  const tuft = (a, b2) => { const b = Buf(7, 4); [[0, 3], [1, 2], [2, 1], [3, 0], [3, 2], [4, 1], [5, 2], [6, 3]].forEach(([x, y]) => { for (let j = y; j < 4; j++) b.set(x, j, j === y ? a : b2); }); return b.compile(); };
+  const tuft = (a, b2) => { const b = Buf(7, 4);[[0, 3], [1, 2], [2, 1], [3, 0], [3, 2], [4, 1], [5, 2], [6, 3]].forEach(([x, y]) => { for (let j = y; j < 4; j++) b.set(x, j, j === y ? a : b2); }); return b.compile(); };
   const shell = () => { const b = Buf(7, 5); b.rect(1, 1, 5, 3, '#f7c9d0'); b.set(0, 2, '#f7c9d0'); b.rect(2, 0, 3, 1, '#f7c9d0'); b.set(3, 2, '#e79aa6'); b.set(2, 3, '#e79aa6'); b.set(4, 3, '#e79aa6'); b.outline('#b0707c'); return b.compile(); };
   const pebbles = c => { const b = Buf(9, 4); b.rect(0, 1, 3, 2, c[0]); b.rect(4, 0, 4, 3, c[1]); b.set(1, 1, c[2]); b.set(5, 0, c[2]); b.outline(c[3]); return b.compile(); };
   const shroom = () => { const b = Buf(7, 7); b.rect(3, 4, 2, 3, '#f1e5c8'); b.disc(3, 3, 3, 2, '#d9483b', '#f27a6a'); b.set(2, 2, '#fff'); b.set(4, 3, '#fff'); b.outline('#4a2230'); return b.compile(); };
@@ -279,20 +279,20 @@
     if (walk) for (let i = 0; i < 5; i++) { const ph = mod(t * 3 + i / 5, 1); R('rgba(255,255,255,' + (.55 * (1 - ph)).toFixed(2) + ')', hx + 3 - ph * 12, fy - 2 - ph * 5, ph < .5 ? 2 : 1, ph < .5 ? 2 : 1); }
     drawHero(R, hx, fy - 1, { skin: o.skin, pose: o.pose, t });
     // Companheiros da sala, sem substituir o herói local.
-    (o.peers || []).slice(0,5).forEach((peer,i)=>{
-      const px=Math.floor(W*.48+i*Math.min(20,W*.075));
-      drawHero(R,px,fy+3+(i%2)*5,{skin:peer.skin,pose:peer.focusing?'walk':'idle',t:t+i*.2});
+    (o.peers || []).slice(0, 5).forEach((peer, i) => {
+      const px = Math.floor(W * .48 + i * Math.min(20, W * .075));
+      drawHero(R, px, fy + 3 + (i % 2) * 5, { skin: peer.skin, pose: peer.focusing ? 'walk' : 'idle', t: t + i * .2 });
     });
-    if(o.petLevel>=2){R('#ffd166',hx-24,fy-15,7,2);R('#ffd166',hx-24,fy-18,2,3);R('#ffd166',hx-19,fy-18,2,3);}
-    if(o.petLevel>=3){for(let i=0;i<5;i++)R('#fff2ac',hx-31+i*4,fy-22+Math.round(Math.sin(t*2+i)*3),1,1);}
-    if(typeof o.hour==='number'){
-      const night=o.hour<6||o.hour>=19,dusk=o.hour>=17&&o.hour<19;
-      if(night){R('rgba(17,24,69,.48)',0,0,W,H);for(let i=0;i<24;i++)R('#dfebff',(i*47+13)%W,(i*17+7)%Math.max(1,gy-12),1,1);R('#f6e8be',sx-3,sy-3,7,7);R('#303e69',sx,sy-4,5,6);}
-      else if(dusk)R('rgba(244,127,78,.18)',0,0,W,H);
+    if (o.petLevel >= 2) { R('#ffd166', hx - 24, fy - 15, 7, 2); R('#ffd166', hx - 24, fy - 18, 2, 3); R('#ffd166', hx - 19, fy - 18, 2, 3); }
+    if (o.petLevel >= 3) { for (let i = 0; i < 5; i++)R('#fff2ac', hx - 31 + i * 4, fy - 22 + Math.round(Math.sin(t * 2 + i) * 3), 1, 1); }
+    if (typeof o.hour === 'number') {
+      const night = o.hour < 6 || o.hour >= 19, dusk = o.hour >= 17 && o.hour < 19;
+      if (night) { R('rgba(17,24,69,.48)', 0, 0, W, H); for (let i = 0; i < 24; i++)R('#dfebff', (i * 47 + 13) % W, (i * 17 + 7) % Math.max(1, gy - 12), 1, 1); R('#f6e8be', sx - 3, sy - 3, 7, 7); R('#303e69', sx, sy - 4, 5, 6); }
+      else if (dusk) R('rgba(244,127,78,.18)', 0, 0, W, H);
     }
-    if(o.weather==='rain'||o.weather==='snow')for(let i=0;i<70;i++){
-      const snow=o.weather==='snow',x=mod(i*43+t*(snow?4:30),W),y=mod(i*31+t*(snow?12:90),H);
-      R(snow?'rgba(255,255,255,.8)':'rgba(154,200,255,.65)',x,y,1,snow?1:4);
+    if (o.weather === 'rain' || o.weather === 'snow') for (let i = 0; i < 70; i++) {
+      const snow = o.weather === 'snow', x = mod(i * 43 + t * (snow ? 4 : 30), W), y = mod(i * 31 + t * (snow ? 12 : 90), H);
+      R(snow ? 'rgba(255,255,255,.8)' : 'rgba(154,200,255,.65)', x, y, 1, snow ? 1 : 4);
     }
     return { heroX: hx, flagX: W - 40, gy };
   }

@@ -1,7 +1,7 @@
 {
   "name": "gamedoro",
   "version": "2.0.0",
-  "description": "gameDoro: timer de foco gamificado com mundos, her\u00f3i, loja, amigos e ranking",
+  "description": "gameDoro: timer de foco gamificado com mundos, herói, loja, amigos e ranking",
   "main": "server.js",
   "engines": {
     "node": ">=22.13"
@@ -14,7 +14,8 @@
     "test:features": "node test-features.js"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "node-fetch": "^3.3.2"
   },
   "license": "MIT",
   "devDependencies": {

@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS achievements(
   earned_at INTEGER NOT NULL,
   description TEXT
 );
+CREATE TABLE IF NOT EXISTS payments(
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  package_id TEXT NOT NULL,
+  reference TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
 `);
 
 db.exec(`CREATE TABLE IF NOT EXISTS progression(user_id INTEGER PRIMARY KEY REFERENCES users(id), data TEXT NOT NULL);`);
@@ -70,17 +78,7 @@ const one = (sql, ...a) => db.prepare(sql).get(...a), all = (sql, ...a) => db.pr
 const progressOf = uid => P.normalize(JSON.parse(one('SELECT data FROM progression WHERE user_id=?', uid)?.data || 'null'));
 const saveProgress = (uid, p) => run('INSERT INTO progression VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET data=excluded.data', uid, JSON.stringify(p));
 
-/* ---------- Senhas, tokens, códigos ---------- */
-const hashPass = p => { const s = crypto.randomBytes(16); return s.toString('hex') + ':' + crypto.scryptSync(p, s, 64).toString('hex'); };
-const checkPass = (p, st) => { const [s, h] = st.split(':'); const a = crypto.scryptSync(p, Buffer.from(s, 'hex'), 64), b = Buffer.from(h, 'hex'); return a.length === b.length && crypto.timingSafeEqual(a, b); };
-const mac = p => crypto.createHmac('sha256', SECRET).update(p).digest('base64url');
-const sign = uid => { const p = Buffer.from(JSON.stringify({ uid, exp: Date.now() + 30 * 864e5 })).toString('base64url'); return p + '.' + mac(p); };
-const verify = t => {
-  const [p, s] = String(t || '').split('.'); if (!p || !s) return null;
-  const e = mac(p); if (e.length !== s.length || !crypto.timingSafeEqual(Buffer.from(e), Buffer.from(s))) return null;
-  try { const d = JSON.parse(Buffer.from(p, 'base64url')); return d.exp > Date.now() ? d.uid : null; } catch { return null; }
-};
-const newCode = () => { for (; ;) { const c = Array.from(crypto.randomBytes(6), b => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join(''); if (!one('SELECT 1 FROM users WHERE code=?', c)) return c; } };
+/* ---------- Senhas, tokens, códigos ---------- */const { hashPass, checkPass, mac, sign, verify, newCode } = require('./src/utils/auth');;
 
 /* ---------- Estado ---------- */
 const utcToday = () => new Date().toISOString().slice(0, 10);
@@ -135,7 +133,7 @@ app.post('/api/auth/register', limiter(20, 15 * 60000), (req, res) => {
   if (pw.length < 8 || pw.length > 128) return bad(res, 'A senha precisa ter de 8 a 128 caracteres.');
   if (one('SELECT 1 FROM users WHERE email=?', email)) return bad(res, 'Este e-mail já está cadastrado.', 409);
   const uid = tx(() => {
-    const r = run('INSERT INTO users(name,email,pass,code,gems,cfg,created_at) VALUES(?,?,?,?,?,?,?)', name, email, hashPass(pw), newCode(), G.WELCOME_GEMS, JSON.stringify(G.DEFAULT_CFG), Date.now());
+    const r = run('INSERT INTO users(name,email,pass,code,gems,cfg,created_at) VALUES(?,?,?,?,?,?,?)', name, email, hashPass(pw), newCode(one), G.WELCOME_GEMS, JSON.stringify(G.DEFAULT_CFG), Date.now());
     GRANT().forEach(i => run('INSERT INTO owned(user_id,item) VALUES(?,?)', r.lastInsertRowid, i));
     return Number(r.lastInsertRowid);
   });
@@ -160,6 +158,7 @@ const creditCoop = require('./cooperative')({ app, db, auth, bad, one, all, run,
 const missions = require('./src/missions')({ app, db, auth, bad, tx });
 const chat = require('./src/chat')({ app, db, auth, bad });
 const achievements = require('./src/achievements')({ app, db, auth, bad });
+const payments = require('./src/payments')({ app, db, auth, bad, tx });
 
 
 /* Sessões: o servidor só credita o que o relógio dele confirma */
