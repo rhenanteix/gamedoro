@@ -1,16 +1,26 @@
 const { spawn } = require('child_process'); const { JSDOM } = require('jsdom'); const assert = require('assert');
 const fs=require('fs'),os=require('os'),path=require('path');
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'gs-'));
-const srv=spawn(process.execPath,['server.js'],{cwd:path.join(__dirname,'..'),env:{...process.env,PORT:3133,DATA_DIR:dir,GAMEDORO_FAST:'1'},stdio:['ignore','ignore','inherit']});
+const srv=spawn(process.execPath,['server.js'],{cwd:path.join(__dirname,'..'),env:{...process.env,PORT:3133,DATA_DIR:dir,GAMEDORO_FAST:'1',SECRET:require('node:crypto').randomBytes(32).toString('hex')},stdio:['ignore','ignore','inherit']});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let dom;
 (async()=>{try{
- for(let i=0;i<40;i++){try{await fetch('http://localhost:3133/api/health');break}catch{await sleep(150)}}
+ await require('./test-server').ready(srv,'http://localhost:3133/api/health');
  const errs=[];
- const dom=await JSDOM.fromURL('http://localhost:3133/',{runScripts:'dangerously',resources:'usable',pretendToBeVisual:true,beforeParse(w){
-  w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){},set fillStyle(v){},get fillStyle(){return ''}});
+ const html = await (await fetch('http://localhost:3133/')).text();
+ dom = new JSDOM(html, {url:'http://localhost:3133/',runScripts:'outside-only',pretendToBeVisual:true});
+ {
+  const w = dom.window;
+  w.HTMLCanvasElement.prototype.getContext=()=>({fillRect(){}});
   w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};
   w.scrollTo=()=>{};w.fetch=(u,o)=>fetch(new URL(u,'http://localhost:3133'),o);w.addEventListener('error',e=>errs.push(e.message));w.console.error=m=>errs.push(String(m));
- }});
+  const publicDir=path.join(__dirname,'..','public');
+  w.Pay=await import('data:text/javascript;base64,'+Buffer.from(fs.readFileSync(path.join(publicDir,'payments.js'))).toString('base64'));
+  for(const file of ['shared.js','progression.js','scene.js']) w.eval(fs.readFileSync(path.join(publicDir,file),'utf8'));
+  const source=fs.readFileSync(path.join(publicDir,'app.js'),'utf8');
+  assert.ok(source.includes("import * as Pay from './payments.js';"), 'Atualize o harness se os imports mudarem');
+  w.eval(source.replace("import * as Pay from './payments.js';",''));
+ }
  const w=dom.window,d=w.document,$=s=>d.querySelector(s);
  for(let i=0;i<80&&!$('#gems').textContent;i++)await sleep(100);
  if(errs.length)console.error(errs);
@@ -52,4 +62,4 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  w.location.hash='#/diario';await sleep(600);assert.match($('#v-diario').textContent,/Minutos por dia/);
  assert.deepEqual(errs.filter(e=>!/Not implemented|AudioContext/i.test(e)),[]);
  console.log('SMOKE OK');
-}catch(e){console.error('SMOKE FALHOU:',e.stack);process.exitCode=1;}finally{srv.kill();fs.rmSync(dir,{recursive:true,force:true});process.exit(process.exitCode||0)}})();
+}catch(e){console.error('SMOKE FALHOU:',e.stack);process.exitCode=1;}finally{dom?.window.close();await require('./test-server').stop(srv);fs.rmSync(dir,{recursive:true,force:true});process.exit(process.exitCode||0)}})();

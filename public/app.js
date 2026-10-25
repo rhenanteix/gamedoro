@@ -494,12 +494,21 @@ import * as Pay from './payments.js';
     requestAnimationFrame(loop);
   }
   (async function boot() {
+    // As fontes são opcionais: não bloquear a cena enquanto a rede responde.
+    const fonts = $('#app-fonts');
+    if (fonts) {
+      const enableFonts = () => { fonts.media = 'all'; };
+      if (fonts.sheet) enableFonts(); else fonts.addEventListener('load', enableFonts, { once: true });
+    }
     drawLogo();
+    main = new Stage($('#stage'), { cssH: cw => (cw > 700 ? 320 : 250), target: 230 });
+    // Desenho inicial independente da API; saldo e progresso só vêm do Store.
+    const preview = TOKEN ? { world: 'floresta', skin: 'aventureiro' } : L;
+    main.draw({ world: preview.world, skin: preview.skin, t: 0, scroll: 0, pose: 'idle', hour: new Date().getHours() });
     try { await Store.load(); } catch (e) {
       if (e.status === 401) { TOKEN = null; try { localStorage.removeItem('gamedoro:token'); } catch (x) { } } else toast(e.message);
       S = localView();
     }
-    main = new Stage($('#stage'), { cssH: cw => (cw > 700 ? 320 : 250), target: 230 });
     setMode('fase'); await route(); checkPaymentReturn(); pollCoop(); setInterval(pollCoop, 15000); setInterval(tick, 250); requestAnimationFrame(loop);
   })();
 })();

@@ -10,8 +10,8 @@
     "start": "node server.js",
     "test": "node test.js",
     "preview": "node tools/render.js preview.png",
-    "smoke": "node tools/smoke.js",
-    "test:features": "node test-features.js",
+    "smoke": "node test-loading.js && node tools/smoke.js",
+    "test:features": "node test-features.js && node test-sprint0.js",
     "test:payments": "node test-payments.js"
   },
   "dependencies": {

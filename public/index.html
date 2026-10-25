@@ -7,7 +7,7 @@
 <meta name="description" content="Timer de foco gamificado no navegador: um herói corre enquanto você estuda ou trabalha. Pomodoro automático, mundos, skins, amigos e ranking. Grátis para começar.">
 <meta name="theme-color" content="#3d4a9a">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Cpath fill='%23232a6b' d='M4 1h8l3 4-7 10L1 5z'/%3E%3Cpath fill='%2356d3c2' d='M5 2h6l2 3-5 8-5-8z'/%3E%3Cpath fill='%23b8f3ea' d='M5 2h3L6 5H3z'/%3E%3C/svg%3E">
-<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link id="app-fonts" media="print" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -64,24 +64,8 @@
     <div class="card" id="focus-guide" hidden aria-live="polite"></div><div class="card" id="room-summary" hidden></div>
   </section>
 
-  <section class="view" id="v-aventura" hidden></section><section class="view" id="v-cooperativo" hidden>
-  <div class="grid3">
-    <div class="card glass" id="missions">
-      <h2>Missões do dia</h2>
-      <p class="muted">Complete a missão para ganhar gemas e XP</p>
-    </div>
-    <aside class="card glass" id="chat">
-      <h2>Chat da equipe</h2>
-      <div id="chat-box" class="chat-box" style="max-height:300px;overflow-y:auto;margin-bottom:8px;"></div>
-      <form id="chat-form" class="row">
-        <input type="text" name="msg" placeholder="Sua mensagem..." required style="flex:1;padding:8px;">
-        <button type="submit" class="btn primary" style="margin-left:4px;">Enviar</button>
-      </form>
-    </aside>
-  </div>
-  <script type="module" src="mission.js"></script>
-  <script type="module" src="chat.js"></script>
-</section>
+  <section class="view" id="v-aventura" hidden></section>
+  <section class="view" id="v-cooperativo" hidden></section>
   <section class="view" id="v-diario" hidden></section>
   <section class="view" id="v-mundos" hidden></section>
   <section class="view" id="v-heroi" hidden></section>

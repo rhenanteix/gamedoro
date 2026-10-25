@@ -113,9 +113,13 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '100kb', verify: (req, res, buffer) => { if (req.path === '/api/payments/webhook') req.rawBody = buffer; } }));
 const hits = new Map();
-const limiter = (max, ms) => (req, res, next) => {
-  const now = Date.now(); let h = hits.get(req.ip); if (!h || h.reset < now) h = { n: 0, reset: now + ms };
-  h.n++; hits.set(req.ip, h); if (h.n > max) return res.status(429).json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }); next();
+const limiter = (max, ms, scope, byUser = false) => (req, res, next) => {
+  const now = Date.now(), key = scope + ':' + (byUser ? req.uid : req.ip);
+  let h = hits.get(key);
+  if (!h || h.reset <= now) h = { n: 0, reset: now + ms };
+  h.n++; hits.set(key, h);
+  if (h.n > max) return res.status(429).json({ error: 'Muitas tentativas. Aguarde alguns minutos.' });
+  next();
 };
 setInterval(() => { const n = Date.now(); for (const [k, v] of hits) if (v.reset < n) hits.delete(k); }, 60000).unref();
 const auth = (req, res, next) => {
@@ -129,7 +133,7 @@ const GRANT = id => [`skin:aventureiro`, `world:floresta`];
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-app.post('/api/auth/register', limiter(20, 15 * 60000), (req, res) => {
+app.post('/api/auth/register', limiter(20, 15 * 60000, 'auth'), (req, res) => {
   const name = String(req.body.name || '').trim(), email = String(req.body.email || '').trim().toLowerCase(), pw = String(req.body.password || '');
   if (name.length < 2 || name.length > 24) return bad(res, 'Informe um nome entre 2 e 24 caracteres.');
   if (!EMAIL.test(email)) return bad(res, 'E-mail inválido.');
@@ -142,7 +146,7 @@ app.post('/api/auth/register', limiter(20, 15 * 60000), (req, res) => {
   });
   res.status(201).json({ token: sign(uid), ...state(uid, todayOf(req.body.today)) });
 });
-app.post('/api/auth/login', limiter(20, 15 * 60000), (req, res) => {
+app.post('/api/auth/login', limiter(20, 15 * 60000, 'auth'), (req, res) => {
   const u = one('SELECT id, pass FROM users WHERE email=?', String(req.body.email || '').trim().toLowerCase());
   if (!u || !checkPass(String(req.body.password || ''), u.pass)) return bad(res, 'E-mail ou senha incorretos.', 401);
   res.json({ token: sign(u.id), ...state(u.id, todayOf(req.body.today)) });
@@ -159,7 +163,7 @@ app.put('/api/settings', auth, (req, res) => {
 // --- Register new feature routers ------------------------------------------------
 const creditCoop = require('./cooperative')({ app, db, auth, bad, one, all, run, tx });
 const missions = require('./src/missions')({ app, db, auth, bad, tx });
-const chat = require('./src/chat')({ app, db, auth, bad });
+const chat = require('./src/chat')({ app, db, auth, bad, limiter });
 const achievements = require('./src/achievements')({ app, db, auth, bad });
 const payments = require('./src/payments')({ app, db, auth, bad, tx });
 
@@ -178,8 +182,9 @@ app.post('/api/sessions/start', auth, (req, res) => {
     // Ensure a mission exists for today for this user
     const hasMission = one('SELECT 1 FROM missions WHERE user_id=? AND day=?', req.uid, req.today);
     if (!hasMission) {
-      const desc = `Concluir ${planned} minutos de foco`; // simple mission description
-      run('INSERT INTO missions(user_id,day,description,reward_gems,reward_xp) VALUES(?,?,?,?,?)', req.uid, req.today, desc, 5, 10);
+      const goal = planned > 0 ? planned : 30;
+      const desc = `Concluir ${goal} minutos de foco`;
+      run('INSERT INTO missions(user_id,day,description,reward_gems,reward_xp,goal_minutes) VALUES(?,?,?,?,?,?)', req.uid, req.today, desc, 5, 10, goal);
     }
   });
   res.json({ ok: true });
@@ -249,7 +254,7 @@ app.get('/api/friends', auth, (req, res) => {
     .map(f => ({ id: f.id, name: f.name, level: G.level(f.xp), weekMin: weekMin(f.id, req.today) })).sort((a, b) => b.weekMin - a.weekMin);
   res.json({ code: one('SELECT code FROM users WHERE id=?', req.uid).code, friends: list });
 });
-app.post('/api/friends', auth, limiter(30, 15 * 60000), (req, res) => {
+app.post('/api/friends', auth, limiter(30, 15 * 60000, 'friends'), (req, res) => {
   const f = one('SELECT id, name FROM users WHERE code=?', String(req.body.code || '').trim().toUpperCase());
   if (!f) return bad(res, 'Código de amigo não encontrado.', 404);
   if (f.id === req.uid) return bad(res, 'Esse é o seu próprio código.');

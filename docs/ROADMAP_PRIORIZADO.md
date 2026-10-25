@@ -4,6 +4,14 @@ Plano executável em três horizontes, para uma pessoa familiarizada com o códi
 
 Baseline de 24/10/2026: API original e pagamentos passam; features falha por expectativa 10 versus recompensa 5; smoke falha por saldo vazio, com harness que não executa app como módulo. Não começar extração com essa divergência ocultada.
 
+## Registro de execução da Sprint 0
+
+Sprint 0 implementada: S0.1–S0.5. Regressões originais e novas cobrem requisito de foco, crédito único, rollback, proprietário, missão antiga, modo livre, reaplicação de migração e isolamento dos limites. `npm run test:features` agora executa também `test-sprint0.js`.
+
+Validação em Chrome headless com perfil/banco temporários: módulos nativos, iniciar/pausar/encerrar como visitante, cadastro, criação de sala e abertura de Ajustes por controle focável em 320/375/640 px, sem overflow horizontal nessas larguras ou erros locais de JavaScript/HTTP. Uma largura extrema de 160 px mantém Ajustes acessível, mas o conteúdo geral ainda apresenta overflow; isso não equivale a uma auditoria completa de zoom/acessibilidade. Áudio e exportação PNG não foram homologados nesta sprint.
+
+Migração entregue: `missions.goal_minutes`, com conversão apenas de descrições legadas reconhecidas (1–120 minutos). IDs, recompensas e resgates existentes são preservados; objetivos desconhecidos/zero não concedem recompensa. Nenhum banco real foi migrado durante os testes. As mudanças de config/auth e recuperação de sessão continuam na Sprint 1/2.
+
 ## Sprint 0 — Quick wins (1–2 dias)
 
 Ordem principal: S0.1 → S0.2 → S0.3 → S0.4. Segurança e baseline têm precedência sobre polimento; se não couberem, mover polimento para o início da Sprint 1.

@@ -3,7 +3,7 @@ const { spawn } = require('node:child_process');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gd-')), port = 3111, base = `http://localhost:${port}`;
-const srv = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: port, DATA_DIR: dir, GAMEDORO_FAST: '1' }, stdio: ['ignore', 'ignore', 'inherit'] });
+const srv = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: port, DATA_DIR: dir, GAMEDORO_FAST: '1', SECRET: require('node:crypto').randomBytes(32).toString('hex') }, stdio: ['ignore', 'ignore', 'inherit'] });
 const call = async (p, o = {}, t) => {
   const r = await fetch(base + p, { method: o.method || 'GET', headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: 'Bearer ' + t } : {}) }, body: o.body ? JSON.stringify(o.body) : undefined });
   return { s: r.status, j: await r.json().catch(() => ({})) };
@@ -11,7 +11,7 @@ const call = async (p, o = {}, t) => {
 const today = new Date().toISOString().slice(0, 10), P = (p, body, t) => call(p, { method: 'POST', body }, t);
 (async () => {
   try {
-    for (let i = 0; i < 40; i++) { try { await fetch(base + '/api/health'); break; } catch { await new Promise(r => setTimeout(r, 150)); } }
+    await require('./tools/test-server').ready(srv, base + '/api/health');
     const u = { name: 'Ana', email: 'ana@exemplo.com', password: 'senha-forte-1', today };
     assert.equal((await P('/api/auth/register', { ...u, password: '123' })).s, 400);
     const reg = await P('/api/auth/register', u); assert.equal(reg.s, 201); assert.equal(reg.j.state.gems, 50);
@@ -68,5 +68,5 @@ const today = new Date().toISOString().slice(0, 10), P = (p, body, t) => call(p,
     assert.equal((await fetch(base + '/')).status, 200);
     console.log('OK: todos os testes passaram');
   } catch (e) { console.error('FALHOU:', e); process.exitCode = 1; }
-  finally { srv.kill(); fs.rmSync(dir, { recursive: true, force: true }); }
+  finally { await require('./tools/test-server').stop(srv); fs.rmSync(dir, { recursive: true, force: true }); }
 })();

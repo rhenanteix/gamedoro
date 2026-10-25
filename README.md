@@ -6,9 +6,9 @@ Timer de foco gamificado (Pomodoro). Um herói pixel art caminha em direção à
 Requer Node.js 22.13+.
 
     npm install
-    npm start            # http://localhost:3004
+    npm start            # http://localhost:3005
     npm test             # testes de ponta a ponta da API
-    npm i -D jsdom && npm run smoke   # teste do frontend em navegador simulado
+    npm run smoke   # teste do frontend em navegador simulado
     npm run preview      # gera preview.png da arte (sem navegador)
 
 Variáveis: `PORT`, `DATA_DIR` (SQLite, padrão `./data`), `SECRET` (assinatura dos tokens; se ausente, é gerado em `DATA_DIR/.secret`), `NODE_ENV=production` (cache dos estáticos).
@@ -39,7 +39,7 @@ Variáveis: `PORT`, `DATA_DIR` (SQLite, padrão `./data`), `SECRET` (assinatura 
 Host de Node com **disco persistente** (Render, Railway, Fly.io, VPS), HTTPS, `SECRET` definido e `DATA_DIR` no disco.
 
 ## Limites atuais
-Sem recuperação de senha por e-mail, sem pagamentos, amigos são adicionados direto por código (sem convite), e o progresso de visitante não migra para a conta.
+Sem recuperação de senha por e-mail; amigos são adicionados direto por código (sem convite), e o progresso de visitante não migra para a conta.
 
 ## Novos recursos
 
@@ -94,3 +94,11 @@ As gemas só entram após o webhook autenticado confirmar o valor e o ambiente d
 Validação local: `npm run test:payments` usa banco temporário e respostas simuladas do provedor; não cria cobranças reais. Para homologar, faça uma compra em Dev mode e confira a entrega do webhook no painel. A ativação em produção depende das credenciais e do webhook configurado no painel.
 
 Referências: [criação de cobrança v1](https://abacatepay.readme.io/reference/postbillingcreate), [eventos v1](https://docs.abacatepay.com/pages/v1/webhooks), [segurança de webhooks](https://docs.abacatepay.com/pages/webhooks). A API v2 usa outro contrato e não é utilizada nesta integração.
+
+### Compatibilidade e correções da Sprint 0
+
+A API legada de missões (`/api/missions/complete`) mantém IDs e recompensas, mas agora exige minutos creditados no dia da missão e permite apenas um resgate. A migração adiciona `goal_minutes` sem apagar registros: descrições antigas no formato `Concluir N minutos de foco` (1–120) são reconhecidas; objetivos desconhecidos ou zero ficam indisponíveis para resgate. Novas missões de modo livre exigem 30 minutos. A Aventura continua usando as regras compartilhadas de progressão.
+
+O chat legado da API é **global**, não privado por sala. Mensagens devem conter 1–500 caracteres após remover espaços externos; há limite de 20 tentativas por minuto por usuário. Os limites de autenticação e adição de amigos usam contadores separados. A interface de Grupo conserva salas e desafios; scripts legados sem autenticação não são mais carregados.
+
+`npm run test:features` inclui regressões da Sprint 0: banco legado, resgate repetido, requisito de foco, isolamento entre contas, rollback e limites. Todas as suítes usam bancos temporários e segredos próprios de teste. O smoke executa os módulos explicitamente no JSDOM; áudio, PNG e layout ainda precisam de navegador real.

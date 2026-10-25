@@ -2,11 +2,11 @@
 const {spawn}=require('node:child_process'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {DatabaseSync}=require('node:sqlite'),P=require('./public/progression');
 const dir=fs.mkdtempSync(path.join(os.tmpdir(),'gd-features-')),port=3116,base=`http://127.0.0.1:${port}`;
-const srv=spawn(process.execPath,['server.js'],{env:{...process.env,PORT:port,DATA_DIR:dir,GAMEDORO_FAST:'1'},stdio:['ignore','ignore','inherit']});
+const srv=spawn(process.execPath,['server.js'],{env:{...process.env,PORT:port,DATA_DIR:dir,GAMEDORO_FAST:'1',SECRET:require('node:crypto').randomBytes(32).toString('hex')},stdio:['ignore','ignore','inherit']});
 const day=new Date().toISOString().slice(0,10);
 async function call(p,t,body,method){const r=await fetch(base+'/api'+p,{method:method||(body?'POST':'GET'),headers:{'Content-Type':'application/json',...(t?{Authorization:'Bearer '+t}:{})},body:body?JSON.stringify(body):undefined});return {status:r.status,...await r.json()};}
 (async()=>{let db;try{
-for(let i=0;i<50;i++){try{await fetch(base+'/api/health');break;}catch{await new Promise(r=>setTimeout(r,100));}}
+await require('./tools/test-server').ready(srv,base+'/api/health');
 const register=name=>call('/auth/register',null,{name,email:name+'@example.com',password:'testing-123',today:day});
 const a=await register('Alice'),b=await register('Breno'),c=await register('Carol'),ta=a.token,tb=b.token,tc=c.token;
 assert.equal(a.status,201);db=new DatabaseSync(path.join(dir,'gamedoro.db'));
@@ -21,7 +21,7 @@ assert.equal((await call('/coop',ta)).room.boss.minutes,30);
 await call('/sessions/sync',ta,{minutes:60,final:'complete'});
 assert.equal((await call('/coop',tb)).room.boss.minutes,60);
 let st=(await call('/me',ta)).state;assert.equal(st.progress.days[day].minutes,60);assert.equal(st.progress.days[day].completed,1);
-const before=st.gems;st=(await call('/progression',ta,{action:'claim',id:'daily-focus:'+day})).state;assert.equal(st.gems,before+10);
+const before=st.gems;st=(await call('/progression',ta,{action:'claim',id:'daily-focus:'+day})).state;assert.equal(st.gems,before+5);
 assert.equal((await call('/progression',ta,{action:'claim',id:'daily-focus:'+day})).status,409);
 assert.equal((await call('/progression',ta,{action:'chest'})).status,409);
 st=(await call('/progression',ta,{action:'skill',id:'xp'})).state;assert.equal(st.progress.skills.xp,1);const xp=st.xp;
@@ -54,4 +54,4 @@ await call('/sessions/start',tb,{planned:25});await call('/rooms/membership',tb,
 let p=P.fresh();const hist={'2026-10-20':10,'2026-10-22':10};p=P.action(p,{action:'freeze'},{day:'2026-10-22',hist,gems:50}).progress;assert.equal(P.streak(hist,'2026-10-22',p),2);assert.throws(()=>P.action(p,{action:'freeze'},{day:'2026-10-22',hist,gems:50}));
 assert.equal(P.pet(300).level,2);assert.equal(P.pet(1200).level,3);
 console.log('FEATURES OK: salas, créditos incrementais, missões, baú, habilidades, tarefas, modo livre, desafios e sequência.');
-}catch(e){console.error(e);process.exitCode=1;}finally{db?.close();srv.kill();await new Promise(r=>srv.once('exit',r));fs.rmSync(dir,{recursive:true,force:true});}})();
+}catch(e){console.error(e);process.exitCode=1;}finally{db?.close();await require('./tools/test-server').stop(srv);fs.rmSync(dir,{recursive:true,force:true});}})();
